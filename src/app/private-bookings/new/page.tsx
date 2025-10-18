@@ -1,6 +1,15 @@
 "use client";
 import { useState } from "react";
 
+type CreateBookingResponse = {
+  ok?: boolean;
+  bookingId?: string;
+  perPerson?: number;
+  total?: number;
+  url?: string;
+  error?: unknown;
+};
+
 export default function NewPrivateBookingPage() {
   const [coachId, setCoachId] = useState("");
   const [tableId, setTableId] = useState(1);
@@ -9,7 +18,7 @@ export default function NewPrivateBookingPage() {
   const [sessionType, setSessionType] = useState("1on1");
   const [memberIds, setMemberIds] = useState("");
 
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<CreateBookingResponse|null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function createBooking() {

@@ -1,16 +1,34 @@
 import { NextResponse } from "next/server";
 import { supabaseService } from "@/lib/supabaseService";
-import { GenerateSessionsSchema } from "../../../../lib/validation/groups";
+import { GenerateSessionsSchema } from "@/lib/validation/groups";
+
+type Schedule = {
+  group_id: string;
+  day_of_week: number;        // 0..6 (Sun..Sat)
+  start_time: string;         // "HH:MM"
+  end_time: string;           // "HH:MM"
+  location: string | null;
+};
+
+type Group = {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  active: boolean;
+};
+
+type SessionRow = { group_id: string; starts_at: string; ends_at: string };
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const parsed = GenerateSessionsSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+
   const { groupId, windowStart, windowEnd, replaceExisting } = parsed.data;
 
   const start = windowStart ? new Date(windowStart) : new Date();
   const end = windowEnd ? new Date(windowEnd) : new Date(Date.now() + 1000 * 60 * 60 * 24 * 7 * 8);
-
   if (end <= start) return NextResponse.json({ error: "windowEnd must be after windowStart" }, { status: 400 });
 
   const sb = supabaseService();
@@ -20,15 +38,16 @@ export async function POST(req: Request) {
   if (gErr) return NextResponse.json({ error: gErr.message }, { status: 400 });
   if (!groups || groups.length === 0) return NextResponse.json({ ok: true, created: 0, info: "No groups found" });
 
-  const groupIds = groups.map(g => g.id);
+  const groupIds = (groups as Group[]).map(g => g.id);
+
   const { data: schedules, error: sErr } = await sb
     .from("group_lesson_schedule")
     .select("group_id, day_of_week, start_time, end_time, location")
     .in("group_id", groupIds);
   if (sErr) return NextResponse.json({ error: sErr.message }, { status: 400 });
 
-  const perGroup: Record<string, any[]> = {};
-  for (const s of schedules || []) {
+  const perGroup: Record<string, Schedule[]> = {};
+  for (const s of (schedules as Schedule[]) || []) {
     perGroup[s.group_id] ||= [];
     perGroup[s.group_id].push(s);
   }
@@ -43,22 +62,30 @@ export async function POST(req: Request) {
   }
 
   let created = 0;
-  for (const g of groups) {
+
+  for (const g of groups as Group[]) {
     const gStart = new Date(Math.max(new Date(g.start_date).getTime(), start.getTime()));
     const gEnd = new Date(Math.min(new Date(g.end_date).getTime(), end.getTime()));
     const sched = perGroup[g.id] || [];
     if (sched.length === 0) continue;
 
-    const rows: any[] = [];
-    for (let d = new Date(Date.UTC(gStart.getUTCFullYear(), gStart.getUTCMonth(), gStart.getUTCDate())); d <= gEnd; d.setUTCDate(d.getUTCDate() + 1)) {
+    const rows: SessionRow[] = [];
+
+    for (
+      let d = new Date(Date.UTC(gStart.getUTCFullYear(), gStart.getUTCMonth(), gStart.getUTCDate()));
+      d <= gEnd;
+      d.setUTCDate(d.getUTCDate() + 1)
+    ) {
       const dow = d.getUTCDay();
       for (const s of sched) {
         if (s.day_of_week === dow) {
-          const [sh, sm] = String(s.start_time).split(":").map((x: string) => parseInt(x, 10));
-          const [eh, em] = String(s.end_time).split(":").map((x: string) => parseInt(x, 10));
+          const [sh, sm] = s.start_time.split(":").map(n => parseInt(n, 10));
+          const [eh, em] = s.end_time.split(":").map(n => parseInt(n, 10));
           const starts = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), sh, sm || 0));
           const ends = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), eh, em || 0));
-          if (ends > starts) rows.push({ group_id: g.id, starts_at: starts.toISOString(), ends_at: ends.toISOString() });
+          if (ends > starts) {
+            rows.push({ group_id: g.id, starts_at: starts.toISOString(), ends_at: ends.toISOString() });
+          }
         }
       }
     }
@@ -71,7 +98,9 @@ export async function POST(req: Request) {
         .insert(chunk, { count: "exact", returning: "minimal", upsert: false });
       if (insErr) {
         const msg = (insErr.message || "").toLowerCase();
-        if (!msg.includes("duplicate key value")) return NextResponse.json({ error: insErr.message }, { status: 400 });
+        if (!msg.includes("duplicate key value")) {
+          return NextResponse.json({ error: insErr.message }, { status: 400 });
+        }
       } else {
         created += count || 0;
       }

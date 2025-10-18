@@ -27,7 +27,7 @@ export default function NewPrivateBookingPage() {
     const res = await fetch("/api/private-bookings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ coachId, tableId: Number(tableId), startsAt, endsAt, sessionType, memberIds: members }),
+      body: JSON.stringify({ coachId, tableId: Number(tableId), startsAt: new Date(startsAt).toISOString(), endsAt: new Date(endsAt).toISOString(), sessionType, memberIds: members }),
     });
     const json = await res.json();
     if (!res.ok) setError(json.error ? JSON.stringify(json.error) : "Error");
@@ -42,10 +42,10 @@ export default function NewPrivateBookingPage() {
           <input className="border rounded p-2 w-full" value={coachId} onChange={e=>setCoachId(e.target.value)} placeholder="uuid" />
         </label>
         <label>Table ID
-          <input className="border rounded p-2 w-full" value={tableId} onChange={e=>setTableId(e.target.value)} />
+          <input className="border rounded p-2 w-full" value={tableId} onChange={e=>setTableId(Number(e.target.value))} />
         </label>
         <label>Type
-          <select className="border rounded p-2 w-full" value={sessionType} onChange={e=>setSessionType(e.target.value)}>
+          <select className="border rounded p-2 w-full" value={sessionType} onChange={e=>setSessionType(e.target.value as "1on1" | "2on1")}>
             <option value="1on1">1-on-1</option>
             <option value="2on1">2-on-1</option>
           </select>

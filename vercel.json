@@ -1,11 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/groups/generate-sessions",
-      "schedule": "0 3 * * *",
-      "method": "POST",
-      "headers": { "content-type": "application/json" },
-      "body": "{}"
+      "path": "/api/cron/generate-sessions",
+      "schedule": "0 4 * * *"
     }
   ]
 }

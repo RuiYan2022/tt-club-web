@@ -1,11 +1,21 @@
-// src/lib/supabaseService.ts
-import { createClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
+import { createServerComponentClient, createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 
-export function supabaseService() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!; // server-only
-  if (!url || !key) {
-    throw new Error("Missing Supabase env vars (URL or SERVICE ROLE KEY).");
-  }
-  return createClient(url, key, { auth: { persistSession: false } });
+/** Server Components (files under /app without "use client") */
+export async function supabaseServer() {
+  const cookieStore = await cookies(); // Next.js App Router: cookies() is async
+  return createServerComponentClient({
+    cookies: () => cookieStore,
+  });
 }
+
+/** Route Handlers (files under /app/api/**/route.ts) */
+export async function supabaseRoute() {
+  const cookieStore = await cookies();
+  return createRouteHandlerClient({
+    cookies: () => cookieStore,
+  });
+}
+
+/** Optional canary export to confirm the module is compiled */
+export const __module_ok = true;

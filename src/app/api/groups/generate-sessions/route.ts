@@ -76,7 +76,7 @@ export async function POST(req: Request) {
       d <= gEnd;
       d.setUTCDate(d.getUTCDate() + 1)
     ) {
-      const dow = d.getUTCDay();
+      const dow = d.getUTCDay()
       for (const s of sched) {
         if (s.day_of_week === dow) {
           const [sh, sm] = s.start_time.split(":").map(n => parseInt(n, 10));
@@ -94,17 +94,18 @@ export async function POST(req: Request) {
     for (let i = 0; i < rows.length; i += chunkSize) {
       const chunk = rows.slice(i, i + chunkSize);
       const { error: insErr, count } = await sb
-        .from("group_sessions")
-        .insert(chunk, { count: "exact", returning: "minimal", upsert: false });
-      if (insErr) {
-        const msg = (insErr.message || "").toLowerCase();
-        if (!msg.includes("duplicate key value")) {
-          return NextResponse.json({ error: insErr.message }, { status: 400 });
-        }
-      } else {
-        created += count || 0;
+      .from("group_sessions")
+      .insert(chunk, { count: "exact" }); // ← removed returning/upsert
+
+    if (insErr) {
+      const msg = (insErr.message || "").toLowerCase();
+      if (!msg.includes("duplicate key value")) {
+        return NextResponse.json({ error: insErr.message }, { status: 400 });
       }
+    } else {
+      created += count || 0;
     }
+  }
   }
 
   return NextResponse.json({ ok: true, created, windowStart: start.toISOString(), windowEnd: end.toISOString() });

@@ -2,11 +2,17 @@ import { NextResponse } from "next/server";
 import { supabaseService } from "@/lib/supabaseService";
 import { UpdateGroupSchema } from "@/lib/validation/adminGroups";
 
+type Params = { groupId: string };
+type Ctx = { params: Params } | { params: Promise<Params> };
+
+function getParams(ctx: Ctx): Promise<Params> {
+  const p = (ctx as { params: Params | Promise<Params> }).params;
+  return p instanceof Promise ? p : Promise.resolve(p);
+}
+
 // GET /api/admin/groups/:groupId
-export async function GET(_req: Request, ctx: any) {
-  // context.params could be a plain object or a Promise
-  const params = ctx?.params && typeof ctx.params.then === "function" ? await ctx.params : ctx.params;
-  const groupId: string = params.groupId;
+export async function GET(_req: Request, ctx: Ctx) {
+  const { groupId } = await getParams(ctx);
 
   const sb = supabaseService();
   const { data: group, error: gErr } = await sb
@@ -27,9 +33,8 @@ export async function GET(_req: Request, ctx: any) {
 }
 
 // PUT /api/admin/groups/:groupId
-export async function PUT(req: Request, ctx: any) {
-  const params = ctx?.params && typeof ctx.params.then === "function" ? await ctx.params : ctx.params;
-  const groupId: string = params.groupId;
+export async function PUT(req: Request, ctx: Ctx) {
+  const { groupId } = await getParams(ctx);
 
   const body = await req.json().catch(() => ({}));
   const parsed = UpdateGroupSchema.safeParse(body);
@@ -37,9 +42,10 @@ export async function PUT(req: Request, ctx: any) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const input = parsed.data;
+
   const sb = supabaseService();
 
-  // 1) Update group core fields
+  // 1) Update group fields
   const { error: uErr } = await sb
     .from("group_lessons")
     .update({

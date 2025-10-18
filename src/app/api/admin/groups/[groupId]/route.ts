@@ -1,28 +1,36 @@
 import { NextResponse } from "next/server";
-//import { z } from "zod";
 import { supabaseService } from "@/lib/supabaseService";
 import { UpdateGroupSchema } from "@/lib/validation/adminGroups";
 
-export async function GET(_: Request, { params }: { params: { groupId: string } }) {
+// GET /api/admin/groups/:groupId
+export async function GET(_req: Request, ctx: any) {
+  // context.params could be a plain object or a Promise
+  const params = ctx?.params && typeof ctx.params.then === "function" ? await ctx.params : ctx.params;
+  const groupId: string = params.groupId;
+
   const sb = supabaseService();
   const { data: group, error: gErr } = await sb
     .from("group_lessons")
     .select("id, name, description, start_date, end_date, location, capacity, rate_per_session_cents, active")
-    .eq("id", params.groupId)
+    .eq("id", groupId)
     .single();
   if (gErr || !group) return NextResponse.json({ error: gErr?.message || "Not found" }, { status: 404 });
 
   const { data: schedule, error: sErr } = await sb
     .from("group_lesson_schedule")
     .select("id, day_of_week, start_time, end_time, location")
-    .eq("group_id", params.groupId)
+    .eq("group_id", groupId)
     .order("day_of_week");
   if (sErr) return NextResponse.json({ error: sErr.message }, { status: 400 });
 
-  return NextResponse.json({ group, schedule });
+  return NextResponse.json({ group, schedule: schedule ?? [] });
 }
 
-export async function PUT(req: Request, { params }: { params: { groupId: string } }) {
+// PUT /api/admin/groups/:groupId
+export async function PUT(req: Request, ctx: any) {
+  const params = ctx?.params && typeof ctx.params.then === "function" ? await ctx.params : ctx.params;
+  const groupId: string = params.groupId;
+
   const body = await req.json().catch(() => ({}));
   const parsed = UpdateGroupSchema.safeParse(body);
   if (!parsed.success) {
@@ -44,15 +52,15 @@ export async function PUT(req: Request, { params }: { params: { groupId: string 
       rate_per_session_cents: input.rate_per_session_cents ?? null,
       active: input.active,
     })
-    .eq("id", params.groupId);
+    .eq("id", groupId);
   if (uErr) return NextResponse.json({ error: uErr.message }, { status: 400 });
 
-  // 2) Replace schedule: simplest approach → delete then insert
-  const { error: delErr } = await sb.from("group_lesson_schedule").delete().eq("group_id", params.groupId);
+  // 2) Replace schedule
+  const { error: delErr } = await sb.from("group_lesson_schedule").delete().eq("group_id", groupId);
   if (delErr) return NextResponse.json({ error: delErr.message }, { status: 400 });
 
   const scheduleRows = input.schedule.map((s) => ({
-    group_id: params.groupId,
+    group_id: groupId,
     day_of_week: s.day_of_week,
     start_time: s.start_time,
     end_time: s.end_time,
@@ -63,16 +71,16 @@ export async function PUT(req: Request, { params }: { params: { groupId: string 
     if (insErr) return NextResponse.json({ error: insErr.message }, { status: 400 });
   }
 
-  // 3) Optional: trigger sync in provided window
+  // 3) Optional: Save & Sync
   if (input.changeFrom && input.changeTo) {
     const base = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
     const res = await fetch(new URL("/api/groups/sync", base), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        groupId: params.groupId,
+        groupId,
         changeFrom: input.changeFrom,
-        changeTo: input.changeTo
+        changeTo: input.changeTo,
       }),
     });
     const json = await res.json();

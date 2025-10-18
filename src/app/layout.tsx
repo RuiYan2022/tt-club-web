@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en"><body>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}><body className="font-sans">>
       <header className="p-4 border-b flex items-center gap-4">
         <Link href="/">Home</Link>
         <Link href="/group-lessons">Group Lessons</Link>

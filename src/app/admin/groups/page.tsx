@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";   // ⬅️ prevent build-time prerender
+export const revalidate = 0;
+
 import Link from "next/link";
 import { supabaseService } from "@/lib/supabaseService";
 

@@ -4,12 +4,12 @@ import {
   createRouteHandlerClient,
 } from "@supabase/auth-helpers-nextjs";
 
-/** Server Components (App Router) */
+// Server Components (files under /app without "use client")
 export function supabaseServer() {
   return createServerComponentClient({ cookies });
 }
 
-/** Route Handlers (/app/api/**/route.ts) */
+// Route Handlers (files under /app/api/[...]/route.ts)
 export function supabaseRoute() {
   return createRouteHandlerClient({ cookies });
 }
